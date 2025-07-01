@@ -6,6 +6,8 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain.llms import HuggingFaceHub
 import os
+HUGGINGFACE_API_KEY = st.secrets["HUGGINGFACEHUB_API_TOKEN"]
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = HUGGINGFACE_API_KEY
 
 st.title("🧙‍♀️ NoteWitch - Chat with Your PDF")
 
