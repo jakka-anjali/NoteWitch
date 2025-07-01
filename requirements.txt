@@ -3,9 +3,4 @@ langchain
 openai
 faiss-cpu
 pymupdf
-streamlit
-langchain
-openai
-faiss-cpu
-pymupdf
 
