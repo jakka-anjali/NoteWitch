@@ -1,7 +1,7 @@
 streamlit
 PyMuPDF
-langchain>=0.1.14
 faiss-cpu
 huggingface-hub
 transformers
 sentence-transformers
+langchain>=0.1.14
