@@ -1,13 +1,9 @@
 import streamlit as st
 import fitz  # PyMuPDF
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.llms import HuggingFaceHub
-import os
-
-HUGGINGFACE_API_KEY = st.secrets["HUGGINGFACEHUB_API_TOKEN"]
-os.environ["HUGGINGFACEHUB_API_TOKEN"] = HUGGINGFACE_API_KEY
+from sentence_transformers import SentenceTransformer
+import faiss
+import numpy as np
+from transformers import pipeline
 
 st.title("🧙‍♀️ NoteWitch - Chat with Your PDF")
 
@@ -19,26 +15,31 @@ if uploaded_file:
     for page in pdf_reader:
         text += page.get_text()
 
-    splitter = CharacterTextSplitter(separator="\n", chunk_size=300, chunk_overlap=50)
-    texts = splitter.split_text(text)
+    # Split text into chunks
+    chunks = text.split("\n\n")
+    chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
 
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    docsearch = FAISS.from_texts(texts, embeddings)
+    # Embed chunks
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    embeddings = model.encode(chunks)
 
+    # Create FAISS index
+    dim = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dim)
+    index.add(np.array(embeddings))
+
+    # Accept query
     query = st.text_input("Ask a question about the PDF:")
-
     if query:
-        docs = docsearch.similarity_search(query, k=3)
-        context = "\n\n".join([doc.page_content for doc in docs])
+        q_embedding = model.encode([query])
+        D, I = index.search(q_embedding, k=3)
 
-        llm = HuggingFaceHub(
-            repo_id="google/flan-t5-base",
-            model_kwargs={"temperature": 0.5, "max_length": 512}
-        )
+        context = "\n\n".join([chunks[i] for i in I[0]])
 
-        prompt = f"Answer the question based on the context below:\n\nContext:\n{context}\n\nQuestion: {query}\nAnswer:"
+        # Load QA model
+        qa = pipeline("question-answering", model="deepset/roberta-base-squad2")
 
-        response = llm(prompt)
+        answer = qa(question=query, context=context)
 
         st.subheader("🧠 Answer:")
-        st.write(response)
+        st.write(answer["answer"])
