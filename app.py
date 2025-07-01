@@ -20,8 +20,8 @@ if uploaded_file and openai_api_key:
         text += page.get_text()
 
     splitter = CharacterTextSplitter(separator="\n", chunk_size=300, chunk_overlap=50)
-texts = splitter.split_text(text)
-texts = texts[:10]
+    texts = splitter.split_text(text)
+    texts = texts[:10]
 
 
     os.environ["OPENAI_API_KEY"] = openai_api_key
