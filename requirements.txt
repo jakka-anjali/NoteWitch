@@ -1,5 +1,5 @@
 streamlit
-langchain
+langchain[faiss]
 openai
 faiss-cpu
 pymupdf
