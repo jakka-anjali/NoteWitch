@@ -1,11 +1,13 @@
 import streamlit as st
-import fitz  # PyMuPDF
+import fitz
+import os
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains import RetrievalQA
-from langchain.llms import HuggingFaceHub
-import os
+from langchain.llms import HuggingFacePipeline
+
 HUGGINGFACE_API_KEY = st.secrets["HUGGINGFACEHUB_API_TOKEN"]
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = HUGGINGFACE_API_KEY
 
@@ -21,7 +23,6 @@ if uploaded_file:
 
     splitter = CharacterTextSplitter(separator="\n", chunk_size=300, chunk_overlap=50)
     texts = splitter.split_text(text)
-    # texts = texts[:10]  # Optional limit — can remove later
 
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     docsearch = FAISS.from_texts(texts, embeddings)
@@ -29,11 +30,12 @@ if uploaded_file:
     query = st.text_input("Ask a question about the PDF:")
 
     if query:
-        # Use Hugging Face model from HuggingFaceHub
-        llm = HuggingFaceHub(
-            repo_id="google/flan-t5-large",
-            model_kwargs={"temperature": 0.5, "max_length": 512}
-        )
+        model_name = "google/flan-t5-base"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+
+        pipe = pipeline("text2text-generation", model=model, tokenizer=tokenizer, max_length=512)
+        llm = HuggingFacePipeline(pipeline=pipe)
 
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
