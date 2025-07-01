@@ -4,4 +4,5 @@ langchain-community
 openai
 faiss-cpu
 pymupdf
+tiktoken
 
