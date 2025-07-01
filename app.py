@@ -1,12 +1,10 @@
 import streamlit as st
-import fitz
-import os
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
+import fitz  # PyMuPDF
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.chains import RetrievalQA
-from langchain.llms import HuggingFacePipeline
+from langchain.llms import HuggingFaceHub
+import os
 
 HUGGINGFACE_API_KEY = st.secrets["HUGGINGFACEHUB_API_TOKEN"]
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = HUGGINGFACE_API_KEY
@@ -30,20 +28,17 @@ if uploaded_file:
     query = st.text_input("Ask a question about the PDF:")
 
     if query:
-        model_name = "google/flan-t5-base"
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        docs = docsearch.similarity_search(query, k=3)
+        context = "\n\n".join([doc.page_content for doc in docs])
 
-        pipe = pipeline("text2text-generation", model=model, tokenizer=tokenizer, max_length=512)
-        llm = HuggingFacePipeline(pipeline=pipe)
-
-        qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=docsearch.as_retriever()
+        llm = HuggingFaceHub(
+            repo_id="google/flan-t5-base",
+            model_kwargs={"temperature": 0.5, "max_length": 512}
         )
 
-        response = qa_chain.run(query)
+        prompt = f"Answer the question based on the context below:\n\nContext:\n{context}\n\nQuestion: {query}\nAnswer:"
+
+        response = llm(prompt)
 
         st.subheader("🧠 Answer:")
         st.write(response)
