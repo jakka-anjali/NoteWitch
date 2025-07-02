@@ -1,9 +1,10 @@
 import streamlit as st
 import fitz  # PyMuPDF
-from sentence_transformers import SentenceTransformer
-import faiss
-import numpy as np
-from transformers import pipeline
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.llms import Ollama
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.chains import RetrievalQA
 
 st.title("🧙‍♀️ NoteWitch - Chat with Your PDF")
 
@@ -15,31 +16,19 @@ if uploaded_file:
     for page in pdf_reader:
         text += page.get_text()
 
-    # Split text into chunks
-    chunks = text.split("\n\n")
-    chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
+    splitter = CharacterTextSplitter(separator="\n", chunk_size=300, chunk_overlap=50)
+    texts = splitter.split_text(text)
 
-    # Embed chunks
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-    embeddings = model.encode(chunks)
+    # ✅ Online embedding model
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    docsearch = FAISS.from_texts(texts, embeddings)
 
-    # Create FAISS index
-    dim = embeddings.shape[1]
-    index = faiss.IndexFlatL2(dim)
-    index.add(np.array(embeddings))
-
-    # Accept query
     query = st.text_input("Ask a question about the PDF:")
+
     if query:
-        q_embedding = model.encode([query])
-        D, I = index.search(q_embedding, k=3)
-
-        context = "\n\n".join([chunks[i] for i in I[0]])
-
-        # Load QA model
-        qa = pipeline("question-answering", model="deepset/roberta-base-squad2")
-
-        answer = qa(question=query, context=context)
+        llm = Ollama(model="mistral")  # still use Ollama for generation
+        qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=docsearch.as_retriever())
+        response = qa_chain.run(query)
 
         st.subheader("🧠 Answer:")
-        st.write(answer["answer"])
+        st.write(response)

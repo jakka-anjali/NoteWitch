@@ -1,6 +1,6 @@
 streamlit
 PyMuPDF
-faiss-cpu
-transformers
 sentence-transformers
-torch
+faiss-cpu
+langchain
+langchain-community
