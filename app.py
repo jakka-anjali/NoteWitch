@@ -1,34 +1,101 @@
+```python
 import streamlit as st
 import fitz  # PyMuPDF
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain_community.llms import Ollama
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.chains import RetrievalQA
+from sentence_transformers import SentenceTransformer
+import faiss
+import numpy as np
+from transformers import pipeline
+
+st.set_page_config(
+    page_title="NoteWitch",
+    page_icon="🧙‍♀️",
+    layout="centered"
+)
 
 st.title("🧙‍♀️ NoteWitch - Chat with Your PDF")
+st.write("Upload a PDF and ask questions about its contents.")
 
-uploaded_file = st.file_uploader("Upload your PDF", type="pdf")
+uploaded_file = st.file_uploader(
+    "📄 Upload your PDF",
+    type="pdf"
+)
 
 if uploaded_file:
-    pdf_reader = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+    # Extract text from PDF
+    pdf_reader = fitz.open(
+        stream=uploaded_file.read(),
+        filetype="pdf"
+    )
+
     text = ""
+
     for page in pdf_reader:
         text += page.get_text()
 
-    splitter = CharacterTextSplitter(separator="\n", chunk_size=300, chunk_overlap=50)
-    texts = splitter.split_text(text)
+    pdf_reader.close()
 
-    # ✅ Online embedding model
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    docsearch = FAISS.from_texts(texts, embeddings)
+    if not text.strip():
+        st.error(
+            "This PDF does not contain extractable text. "
+            "Please upload a text-based PDF."
+        )
+        st.stop()
 
-    query = st.text_input("Ask a question about the PDF:")
+    # Split text into chunks
+    chunks = text.split("\n\n")
+    chunks = [
+        chunk.strip()
+        for chunk in chunks
+        if chunk.strip()
+    ]
+
+    # Load embedding model
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+
+    # Create embeddings
+    embeddings = model.encode(chunks)
+
+    # Create FAISS index
+    dim = embeddings.shape[1]
+
+    index = faiss.IndexFlatL2(dim)
+    index.add(np.array(embeddings))
+
+    st.success("✅ PDF processed successfully!")
+
+    # Accept query
+    query = st.text_input(
+        "🔎 Ask a question about the PDF:"
+    )
 
     if query:
-        llm = Ollama(model="mistral")  # still use Ollama for generation
-        qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=docsearch.as_retriever())
-        response = qa_chain.run(query)
+        # Embed query
+        q_embedding = model.encode([query])
+
+        # Retrieve most relevant chunks
+        D, I = index.search(q_embedding, k=min(3, len(chunks)))
+
+        context = "\n\n".join(
+            [chunks[i] for i in I[0]]
+        )
+
+        # Load Question Answering model
+        qa = pipeline(
+            task="question-answering",
+            model="deepset/roberta-base-squad2",
+            framework="pt"
+        )
+
+        # Generate answer from retrieved context
+        answer = qa(
+            question=query,
+            context=context
+        )
 
         st.subheader("🧠 Answer:")
-        st.write(response)
+        st.write(answer["answer"])
+
+        st.caption(
+            f"Confidence: {answer['score']:.2%}"
+        )
+```
