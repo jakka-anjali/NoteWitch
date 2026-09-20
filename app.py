@@ -1,4 +1,4 @@
-```python
+python
 import streamlit as st
 import fitz  # PyMuPDF
 from sentence_transformers import SentenceTransformer
@@ -98,4 +98,4 @@ if uploaded_file:
         st.caption(
             f"Confidence: {answer['score']:.2%}"
         )
-```
+
